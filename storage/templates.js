@@ -88,7 +88,21 @@ export async function deleteTemplate(templateId) {
 
 export async function renameTemplate(templateId, name) {
   const templates = await getAllTemplates();
-  const next = templates.map(t => (t.id === templateId ? { ...t, name } : t));
+  const next = templates.map(t => {
+    if (t.id === templateId) {
+      // 更新模板名稱
+      return { ...t, name };
+    } else {
+      // 更新所有引用該模板的 Sub-Template 選項
+      const updatedOptions = t.options.map(option => {
+        if (option.type === 'subtemplate' && option.subTemplateId === templateId) {
+          return { ...option, label: name };
+        }
+        return option;
+      });
+      return { ...t, options: updatedOptions };
+    }
+  });
   await saveAllTemplates(next);
 }
 
@@ -104,13 +118,34 @@ export async function addOption(templateId, label, type = 'text', subTemplateId 
 
 export async function updateOption(templateId, optionId, updates) {
   const templates = await getAllTemplates();
+  
+  // 先檢查是否更新的是 Sub-Template 選項的 label
+  let referencedTemplateId = null;
+  if (updates.label) {
+    const currentTemplate = templates.find(t => t.id === templateId);
+    if (currentTemplate) {
+      const option = currentTemplate.options.find(o => o.id === optionId);
+      if (option && option.type === 'subtemplate' && option.subTemplateId) {
+        referencedTemplateId = option.subTemplateId;
+      }
+    }
+  }
+  
+  // 更新所有模板
   const next = templates.map(t => {
-    if (t.id !== templateId) return t;
-    return {
-      ...t,
-      options: t.options.map(o => (o.id === optionId ? { ...o, ...updates } : o)),
-    };
+    if (t.id === templateId) {
+      // 更新當前模板的選項
+      return {
+        ...t,
+        options: t.options.map(o => (o.id === optionId ? { ...o, ...updates } : o)),
+      };
+    } else if (referencedTemplateId && t.id === referencedTemplateId) {
+      // 更新被引用模板的名稱
+      return { ...t, name: updates.label };
+    }
+    return t;
   });
+  
   await saveAllTemplates(next);
 }
 

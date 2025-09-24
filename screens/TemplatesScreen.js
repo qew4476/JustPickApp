@@ -24,6 +24,8 @@ export default function TemplatesScreen() {
   const [newSubTemplateId, setNewSubTemplateId] = useState('');
   const [editingOptionId, setEditingOptionId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [editingTemplateName, setEditingTemplateName] = useState('');
 
   async function refresh() {
     const [all, current] = await Promise.all([getAllTemplates(), getCurrentTemplateId()]);
@@ -140,6 +142,30 @@ export default function TemplatesScreen() {
     cancelEditing();
   }
 
+  // 開始編輯模板名稱
+  function startEditingTemplate(template) {
+    setEditingTemplateId(template.id);
+    setEditingTemplateName(template.name);
+  }
+
+  // 取消編輯模板名稱
+  function cancelEditingTemplate() {
+    setEditingTemplateId(null);
+    setEditingTemplateName('');
+  }
+
+  // 保存編輯模板名稱
+  async function saveEditingTemplate() {
+    if (!editingTemplateId || !editingTemplateName.trim()) {
+      cancelEditingTemplate();
+      return;
+    }
+    
+    await renameTemplate(editingTemplateId, editingTemplateName.trim());
+    await refresh();
+    cancelEditingTemplate();
+  }
+
   const tpl = currentTemplate();
 
   return (
@@ -157,7 +183,11 @@ export default function TemplatesScreen() {
           data={templates}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => onSelectTemplate(item.id)} style={[styles.tplChip, item.id === currentId && styles.tplChipActive]}>
+            <TouchableOpacity 
+              onPress={() => onSelectTemplate(item.id)} 
+              onLongPress={() => startEditingTemplate(item)}
+              style={[styles.tplChip, item.id === currentId && styles.tplChipActive]}
+            >
               <Text style={styles.tplChipText}>{item.name}</Text>
             </TouchableOpacity>
           )}
@@ -290,6 +320,36 @@ export default function TemplatesScreen() {
                 <Text style={styles.modalCancelText}>{getWord('Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={saveEditingOption} style={styles.modalSaveBtn}>
+                <Text style={styles.modalSaveText}>{getWord('Save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 編輯模板名稱的 Modal Dialog */}
+      <Modal
+        visible={editingTemplateId !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelEditingTemplate}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{getWord('Edit Template Name')}</Text>
+            <TextInput
+              value={editingTemplateName}
+              onChangeText={setEditingTemplateName}
+              style={styles.modalInput}
+              placeholder={getWord('Enter template name')}
+              autoFocus
+              multiline
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={cancelEditingTemplate} style={styles.modalCancelBtn}>
+                <Text style={styles.modalCancelText}>{getWord('Cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveEditingTemplate} style={styles.modalSaveBtn}>
                 <Text style={styles.modalSaveText}>{getWord('Save')}</Text>
               </TouchableOpacity>
             </View>
