@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, Modal, FlatList, PanResponder, Animated } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, Modal, FlatList, PanResponder, Animated, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Wheel from '../components/Wheel';
 import { getWord } from '../i18n';
@@ -23,6 +23,11 @@ export default function HomeScreen() {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [screenDimensions, setScreenDimensions] = useState(null);
+  const [modalDimensions, setModalDimensions] = useState(null);
+  const [flatListDimensions, setFlatListDimensions] = useState(null);
+  const [flatListAbsolutePosition, setFlatListAbsolutePosition] = useState(null);
+  const [flatListScrollOffset, setFlatListScrollOffset] = useState(0);
   const dragAnimValue = useRef(new Animated.Value(0)).current;
   const dragPosition = useRef(new Animated.ValueXY()).current;
   const dragScale = useRef(new Animated.Value(1)).current;
@@ -34,6 +39,12 @@ export default function HomeScreen() {
       getHidePickedEnabled(),
       getAllTemplates(),
     ]);
+    
+    // 檢查template是否發生了變化，如果變化了就清空抽籤結果
+    if (template && tpl && template.id !== tpl.id) {
+      setLastResult(null);
+    }
+    
     setTemplate(tpl);
     setHidePicked(hide);
     setTemplates(allTemplates);
@@ -41,6 +52,11 @@ export default function HomeScreen() {
 
   useEffect(() => {
     refresh();
+    
+    // 获取屏幕尺寸
+    const { width, height } = Dimensions.get('window');
+    setScreenDimensions({ width, height });
+    console.log('屏幕尺寸:', { width, height });
   }, []);
 
   // 當屏幕獲得焦點時刷新數據（例如從 Templates 頁面返回時）
@@ -184,8 +200,29 @@ export default function HomeScreen() {
         // 計算相對於初始位置的偏移
         const currentX = evt.nativeEvent.pageX;
         const currentY = evt.nativeEvent.pageY;
-        const offsetX = currentX - initialTouchPosition.current.x;
-        const offsetY = currentY - initialTouchPosition.current.y;
+        let offsetX = currentX - initialTouchPosition.current.x;
+        let offsetY = currentY - initialTouchPosition.current.y;
+        
+        // 使用拖曳的絕對座標來限制拖拽範圍
+        if (flatListAbsolutePosition) {
+          const itemHeight = 64;
+          
+          // 直接使用拖曳的絕對座標
+          const draggedItemAbsoluteY = currentY;
+          
+          // 計算 FlatList 的邊界
+          const flatListTop = flatListAbsolutePosition.y;
+          const flatListBottom = flatListAbsolutePosition.y + flatListAbsolutePosition.height;
+          
+          // 限制拖拽項目不能超出 FlatList 邊界
+          if (draggedItemAbsoluteY < flatListTop) {
+            // 拖拽到頂部邊界
+            offsetY = flatListTop - initialTouchPosition.current.y;
+          } else if (draggedItemAbsoluteY + itemHeight > flatListBottom) {
+            // 拖拽到底部邊界
+            offsetY = flatListBottom - initialTouchPosition.current.y - itemHeight;
+          }
+        }
         
         // 更新拖動位置
         dragPosition.setValue({
@@ -253,7 +290,7 @@ export default function HomeScreen() {
         });
       },
     });
-  }, [templates, dragOverIndex, draggedIndex, dragAnimValue, dragPosition, dragScale, initialTouchPosition]);
+  }, [templates, dragOverIndex, draggedIndex, dragAnimValue, dragPosition, dragScale, initialTouchPosition, flatListAbsolutePosition, flatListScrollOffset]);
 
   return (
     <View style={styles.container}>
@@ -304,11 +341,36 @@ export default function HomeScreen() {
             style={styles.modalContainer}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
+            onLayout={(event) => {
+              const layout = event.nativeEvent.layout;
+              setModalDimensions(layout);
+            }}
           >
             <Text style={styles.modalTitle}>{getWord('Select Template')}</Text>
             <FlatList
               data={templates}
               keyExtractor={item => item.id}
+              onScroll={(event) => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                setFlatListScrollOffset(offsetY);
+              }}
+              scrollEventThrottle={16}
+              onLayout={(event) => {
+                const layout = event.nativeEvent.layout;
+                setFlatListDimensions(layout);
+                
+                // 计算 FlatList 相对于整个屏幕的绝对坐标
+                if (modalDimensions) {
+                  const absolutePosition = {
+                    x: modalDimensions.x + layout.x,
+                    y: modalDimensions.y + layout.y,
+                    width: layout.width,
+                    height: layout.height
+                  };
+                  setFlatListAbsolutePosition(absolutePosition);
+                  
+                }
+              }}
               renderItem={({ item, index }) => {
                 const panResponder = createDragResponder(item, index);
                 const isDragging = draggedIndex === index;
