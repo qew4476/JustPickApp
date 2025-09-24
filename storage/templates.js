@@ -78,7 +78,21 @@ export async function createTemplate(name) {
 
 export async function deleteTemplate(templateId) {
   const templates = await getAllTemplates();
-  const next = templates.filter(t => t.id !== templateId);
+  
+  // 刪除模板並清理所有引用該模板的 Sub-Template 選項
+  const next = templates.map(t => {
+    if (t.id === templateId) {
+      // 跳過要刪除的模板
+      return null;
+    } else {
+      // 清理引用該模板的 Sub-Template 選項
+      const cleanedOptions = t.options.filter(option => 
+        !(option.type === 'subtemplate' && option.subTemplateId === templateId)
+      );
+      return { ...t, options: cleanedOptions };
+    }
+  }).filter(t => t !== null); // 移除 null 值（被刪除的模板）
+  
   await saveAllTemplates(next);
   const currentId = await getCurrentTemplateId();
   if (currentId === templateId) {

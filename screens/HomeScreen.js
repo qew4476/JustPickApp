@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Wheel from '../components/Wheel';
 import { getWord } from '../i18n';
@@ -17,14 +17,18 @@ export default function HomeScreen() {
   const [template, setTemplate] = useState(null);
   const [hidePicked, setHidePicked] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
   async function refresh() {
-    const [tpl, hide] = await Promise.all([
+    const [tpl, hide, allTemplates] = await Promise.all([
       getCurrentTemplate(),
       getHidePickedEnabled(),
+      getAllTemplates(),
     ]);
     setTemplate(tpl);
     setHidePicked(hide);
+    setTemplates(allTemplates);
   }
 
   useEffect(() => {
@@ -99,8 +103,29 @@ export default function HomeScreen() {
     setTemplate(tpl);
   }
 
+  async function onSelectTemplate(templateId) {
+    await setCurrentTemplateId(templateId);
+    const tpl = await getCurrentTemplate();
+    setTemplate(tpl);
+    setShowTemplateDropdown(false);
+    setLastResult(null); // 清空結果，因為切換了模板
+  }
+
   return (
     <View style={styles.container}>
+      {/* 模板選擇 Dropdown */}
+      <View style={styles.templateSelector}>
+        <TouchableOpacity 
+          onPress={() => setShowTemplateDropdown(true)}
+          style={styles.templateButton}
+        >
+          <Text style={styles.templateButtonText}>
+            {template ? template.name : getWord('Select Template')}
+          </Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.resultContainer}>
         {lastResult ? (
           <Text style={styles.result}>{lastResult.label}</Text>
@@ -118,6 +143,54 @@ export default function HomeScreen() {
           <Text style={styles.refreshText}>{getWord('Refresh')}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 模板選擇 Modal */}
+      <Modal
+        visible={showTemplateDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTemplateDropdown(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTemplateDropdown(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.modalTitle}>{getWord('Select Template')}</Text>
+            <FlatList
+              data={templates}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => onSelectTemplate(item.id)}
+                  style={[
+                    styles.templateOption,
+                    template && template.id === item.id && styles.templateOptionActive
+                  ]}
+                >
+                  <Text style={[
+                    styles.templateOptionText,
+                    template && template.id === item.id && styles.templateOptionTextActive
+                  ]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity 
+              onPress={() => setShowTemplateDropdown(false)} 
+              style={styles.modalCancelBtn}
+            >
+              <Text style={styles.modalCancelText}>{getWord('Cancel')}</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -174,6 +247,81 @@ const styles = StyleSheet.create({
   refreshText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  // 模板選擇器樣式
+  templateSelector: {
+    marginBottom: 16,
+  },
+  templateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  templateButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#666',
+  },
+  // Modal 樣式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  templateOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#f8f8f8',
+  },
+  templateOptionActive: {
+    backgroundColor: '#e3f2fd',
+  },
+  templateOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  templateOptionTextActive: {
+    color: '#1976d2',
+    fontWeight: 'bold',
+  },
+  modalCancelBtn: {
+    marginTop: 16,
+    paddingVertical: 12,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

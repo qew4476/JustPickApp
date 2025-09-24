@@ -505,6 +505,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginTop: 12,
+    marginBottom: 20,
     flexWrap: 'wrap',
   },
   optionTypeLabel: {
@@ -542,6 +543,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 20
   },
   subTemplateOption: {
     paddingHorizontal: 12,

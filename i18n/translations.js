@@ -1,28 +1,7 @@
 
 export const translations = {
   en: {
-    'Option Type': 'Option Type',
-    'Text': 'Text',
-    'Sub-Template': 'Sub-Template',
-    'Select Sub-Template': 'Select Sub-Template',
-    'Switch to Sub-Template': 'Switch to Sub-Template',
-    'Switch to': 'Switch to',
-    'Go': 'Go',
-    'Error': 'Error',
-    'Please select a sub-template': 'Please select a sub-template',
-    'Will use name': 'Will use name',
-    'Select a sub-template above': 'Select a sub-template above',
-    'Please enter option label': 'Please enter option label',
-    'Sub-template not found': 'Sub-template not found',
-    'Templates': 'Templates',
-    'Delete': 'Delete',
-    'Create': 'Create',
-    'New template name': 'New template name',
-    'Options': 'Options',
-    'Disable': 'Disable',
-    'Enable': 'Enable',
-    'New option label': 'New option label',
-    'Add': 'Add',
+    // English translations are handled directly by returning the key
   },
 
   'zh-TW': {
