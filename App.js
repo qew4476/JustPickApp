@@ -1,25 +1,22 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import { setLanguage, getWord } from './i18n';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { setLanguage } from './i18n';
+import HomeScreen from './screens/HomeScreen';
+import TemplatesScreen from './screens/TemplatesScreen';
 
-// Demo: set app language (options: 'en', 'zh-TW', 'zh-CN', 'ja')
-setLanguage('zh-TW');
+setLanguage('en');
+
+const Tab = createBottomTabNavigator();
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>{getWord('Hello')}</Text>
-      <Text>{getWord('Confirm')}</Text>
+    <NavigationContainer>
       <StatusBar style="auto" />
-    </View>
+      <Tab.Navigator>
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Templates" component={TemplatesScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
