@@ -194,7 +194,8 @@ export default function HomeScreen() {
         });
         
         // 計算當前拖動位置對應的索引
-        const itemHeight = 48; // 每個項目的高度
+        // 使用更準確的項目高度計算（包括margin和padding）
+        const itemHeight = 64; // 8(padding) + 8(margin) + 16(padding) + 32(實際內容高度) = 64
         const relativeY = offsetY + (draggedIndex * itemHeight);
         let newIndex = Math.round(relativeY / itemHeight);
         
