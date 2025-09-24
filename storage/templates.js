@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   templates: 'jp.templates',
   currentTemplateId: 'jp.currentTemplateId',
   hidePickedEnabled: 'jp.hidePickedEnabled',
+  clearResultFlag: 'jp.clearResultFlag',
 };
 
 function generateId(prefix) {
@@ -204,6 +205,19 @@ export async function clearHiddenOptions(templateId) {
   const templates = await getAllTemplates();
   const next = templates.map(t => (t.id === templateId ? { ...t, hiddenOptionIds: [] } : t));
   await saveAllTemplates(next);
+}
+
+export async function setClearResultFlag() {
+  await AsyncStorage.setItem(STORAGE_KEYS.clearResultFlag, 'true');
+}
+
+export async function getClearResultFlag() {
+  const flag = await AsyncStorage.getItem(STORAGE_KEYS.clearResultFlag);
+  return flag === 'true';
+}
+
+export async function clearClearResultFlag() {
+  await AsyncStorage.removeItem(STORAGE_KEYS.clearResultFlag);
 }
 
 

@@ -11,6 +11,8 @@ import {
   clearHiddenOptions,
   getAllTemplates,
   setCurrentTemplateId,
+  getClearResultFlag,
+  clearClearResultFlag,
 } from '../storage/templates';
 
 export default function HomeScreen() {
@@ -34,14 +36,20 @@ export default function HomeScreen() {
   const initialTouchPosition = useRef({ x: 0, y: 0 });
 
   async function refresh() {
-    const [tpl, hide, allTemplates] = await Promise.all([
+    const [tpl, hide, allTemplates, shouldClearResult] = await Promise.all([
       getCurrentTemplate(),
       getHidePickedEnabled(),
       getAllTemplates(),
+      getClearResultFlag(),
     ]);
     
+    // 檢查是否需要清空抽籤結果（從TemplatesScreen切換template時）
+    if (shouldClearResult) {
+      setLastResult(null);
+      await clearClearResultFlag();
+    }
     // 檢查template是否發生了變化，如果變化了就清空抽籤結果
-    if (template && tpl && template.id !== tpl.id) {
+    else if (template && tpl && template.id !== tpl.id) {
       setLastResult(null);
     }
     

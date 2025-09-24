@@ -13,6 +13,7 @@ import {
   toggleOptionEnabled,
   deleteOption,
   renameTemplate,
+  setClearResultFlag,
 } from '../storage/templates';
 
 export default function TemplatesScreen() {
@@ -60,6 +61,7 @@ export default function TemplatesScreen() {
   async function onSelectTemplate(id) {
     await setCurrentTemplateId(id);
     setCurrentId(id);
+    await setClearResultFlag(); // 設置清空抽籤結果的標記
     await refresh();
   }
 
