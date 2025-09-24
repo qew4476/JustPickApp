@@ -13,9 +13,31 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <Tab.Navigator>
-        <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Templates" component={TemplatesScreen} />
+      <Tab.Navigator
+        screenOptions={{
+          tabBarShowLabel: true,
+          tabBarIconStyle: { display: 'none' },
+          headerShown: false,
+          tabBarLabelStyle: {
+            fontSize: 16,
+            fontWeight: 'bold',
+          },
+        }}
+      >
+        <Tab.Screen 
+          name="Home" 
+          component={HomeScreen}
+          options={{
+            tabBarLabel: 'Home',
+          }}
+        />
+        <Tab.Screen 
+          name="Templates" 
+          component={TemplatesScreen}
+          options={{
+            tabBarLabel: 'Templates',
+          }}
+        />
       </Tab.Navigator>
     </NavigationContainer>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, Modal } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getWord } from '../i18n';
 import {
@@ -9,6 +9,7 @@ import {
   createTemplate,
   deleteTemplate,
   addOption,
+  updateOption,
   toggleOptionEnabled,
   deleteOption,
   renameTemplate,
@@ -21,6 +22,8 @@ export default function TemplatesScreen() {
   const [newOptionLabel, setNewOptionLabel] = useState('');
   const [newOptionType, setNewOptionType] = useState('text'); // 'text' or 'subtemplate'
   const [newSubTemplateId, setNewSubTemplateId] = useState('');
+  const [editingOptionId, setEditingOptionId] = useState(null);
+  const [editingText, setEditingText] = useState('');
 
   async function refresh() {
     const [all, current] = await Promise.all([getAllTemplates(), getCurrentTemplateId()]);
@@ -113,6 +116,30 @@ export default function TemplatesScreen() {
     await refresh();
   }
 
+  // 開始編輯選項（使用 dialog）
+  function startEditingOption(option) {
+    setEditingOptionId(option.id);
+    setEditingText(option.label);
+  }
+
+  // 取消編輯
+  function cancelEditing() {
+    setEditingOptionId(null);
+    setEditingText('');
+  }
+
+  // 保存編輯
+  async function saveEditingOption() {
+    if (!editingOptionId || !editingText.trim()) {
+      cancelEditing();
+      return;
+    }
+    
+    await updateOption(currentId, editingOptionId, { label: editingText.trim() });
+    await refresh();
+    cancelEditing();
+  }
+
   const tpl = currentTemplate();
 
   return (
@@ -159,9 +186,18 @@ export default function TemplatesScreen() {
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <View style={styles.optionRow}>
-            <Text style={[styles.optionLabel, item.enabled === false && styles.optionDisabled]}>
-              {item.type === 'subtemplate' ? '⭐ ' : ''}{item.label}
-            </Text>
+            <TouchableOpacity
+              onLongPress={() => startEditingOption(item)}
+              style={styles.optionLabelContainer}
+            >
+              <Text 
+                style={[styles.optionLabel, item.enabled === false && styles.optionDisabled]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {item.type === 'subtemplate' ? '⭐ ' : ''}{item.label}
+              </Text>
+            </TouchableOpacity>
             <View style={styles.optionActions}>
               <TouchableOpacity onPress={() => onToggleOption(item.id, !(item.enabled !== false))} style={styles.secondaryBtn}>
                 <Text>{item.enabled !== false ? getWord('Disable') : getWord('Enable')}</Text>
@@ -230,6 +266,36 @@ export default function TemplatesScreen() {
           </View>
         </View>
       )}
+
+      {/* 編輯選項的 Modal Dialog */}
+      <Modal
+        visible={editingOptionId !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelEditing}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{getWord('Edit Option')}</Text>
+            <TextInput
+              value={editingText}
+              onChangeText={setEditingText}
+              style={styles.modalInput}
+              placeholder={getWord('Enter option text')}
+              autoFocus
+              multiline
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={cancelEditing} style={styles.modalCancelBtn}>
+                <Text style={styles.modalCancelText}>{getWord('Cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveEditingOption} style={styles.modalSaveBtn}>
+                <Text style={styles.modalSaveText}>{getWord('Save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -303,6 +369,8 @@ const styles = StyleSheet.create({
   },
   optionLabel: {
     fontSize: 15,
+    flex: 1,
+    marginRight: 8,
   },
   optionDisabled: {
     color: '#999',
@@ -311,6 +379,10 @@ const styles = StyleSheet.create({
   optionActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  optionLabelContainer: {
+    flex: 1,
+    marginRight: 8,
   },
   input: {
     flex: 1,
@@ -430,6 +502,66 @@ const styles = StyleSheet.create({
   subTemplateOptionTextActive: {
     color: '#2e7d32',
     fontWeight: 'bold',
+  },
+  // Modal Dialog 樣式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginBottom: 20,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: '#1976d2',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
