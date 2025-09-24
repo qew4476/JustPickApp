@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, Modal, FlatList, PanResponder, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Wheel from '../components/Wheel';
 import { getWord } from '../i18n';
@@ -19,6 +19,14 @@ export default function HomeScreen() {
   const [lastResult, setLastResult] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const dragAnimValue = useRef(new Animated.Value(0)).current;
+  const dragPosition = useRef(new Animated.ValueXY()).current;
+  const dragScale = useRef(new Animated.Value(1)).current;
+  const initialTouchPosition = useRef({ x: 0, y: 0 });
 
   async function refresh() {
     const [tpl, hide, allTemplates] = await Promise.all([
@@ -103,6 +111,33 @@ export default function HomeScreen() {
     setTemplate(tpl);
   }
 
+  // 計算字符串的UTF-8字節長度
+  function getByteLength(str) {
+    return new TextEncoder().encode(str).length;
+  }
+
+  // 截取字符串到指定字節長度
+  function truncateByBytes(str, maxBytes) {
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const bytes = encoder.encode(str);
+    
+    if (bytes.length <= maxBytes) {
+      return str;
+    }
+    
+    // 截取到最大字節長度
+    const truncatedBytes = bytes.slice(0, maxBytes);
+    let truncatedStr = decoder.decode(truncatedBytes);
+    
+    // 如果截取後的字節長度仍然超過限制，繼續截取
+    while (getByteLength(truncatedStr) > maxBytes) {
+      truncatedStr = truncatedStr.slice(0, -1);
+    }
+    
+    return truncatedStr + '...';
+  }
+
   async function onSelectTemplate(templateId) {
     await setCurrentTemplateId(templateId);
     const tpl = await getCurrentTemplate();
@@ -110,6 +145,114 @@ export default function HomeScreen() {
     setShowTemplateDropdown(false);
     setLastResult(null); // 清空結果，因為切換了模板
   }
+
+  // 創建拖動響應器 - 只在拖動手柄區域響應
+  const createDragResponder = useCallback((item, index) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true, // 響應觸控開始
+      onMoveShouldSetPanResponder: () => true, // 響應移動
+      onStartShouldSetPanResponderCapture: () => false, // 不攔截觸控事件，讓 TouchableOpacity 先處理
+      onMoveShouldSetPanResponderCapture: () => false, // 不攔截移動事件
+      
+      onPanResponderGrant: (evt, gestureState) => {
+        setDraggedItem(item);
+        setDraggedIndex(index);
+        
+        // 記錄初始觸摸位置
+        initialTouchPosition.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY
+        };
+        
+        // 設置初始位置
+        dragPosition.setValue({ x: 0, y: 0 });
+        
+        // 開始拖動動畫
+        Animated.parallel([
+          Animated.spring(dragAnimValue, {
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+          Animated.spring(dragScale, {
+            toValue: 1.1,
+            useNativeDriver: true,
+          })
+        ]).start();
+      },
+      
+      onPanResponderMove: (evt, gestureState) => {
+        // 計算相對於初始位置的偏移
+        const currentX = evt.nativeEvent.pageX;
+        const currentY = evt.nativeEvent.pageY;
+        const offsetX = currentX - initialTouchPosition.current.x;
+        const offsetY = currentY - initialTouchPosition.current.y;
+        
+        // 更新拖動位置
+        dragPosition.setValue({
+          x: offsetX,
+          y: offsetY
+        });
+        
+        // 計算當前拖動位置對應的索引
+        const itemHeight = 48; // 每個項目的高度
+        const relativeY = offsetY + (draggedIndex * itemHeight);
+        let newIndex = Math.round(relativeY / itemHeight);
+        
+        // 確保索引在有效範圍內
+        newIndex = Math.max(0, Math.min(templates.length - 1, newIndex));
+        
+        // 如果拖動到有效位置且與當前不同，更新目標索引
+        if (newIndex !== dragOverIndex && newIndex !== draggedIndex && newIndex >= 0 && newIndex < templates.length) {
+          setDragOverIndex(newIndex);
+        }
+      },
+      
+      onPanResponderRelease: async () => {
+        const targetIndex = dragOverIndex !== null ? dragOverIndex : draggedIndex;
+        
+        // 立即更新數據
+        if (draggedIndex !== null && draggedIndex !== targetIndex && targetIndex !== null) {
+          const newTemplates = [...templates];
+          const [draggedTemplate] = newTemplates.splice(draggedIndex, 1);
+          newTemplates.splice(targetIndex, 0, draggedTemplate);
+          
+          setTemplates(newTemplates);
+          
+          // 保存新的順序到存儲
+          import('../storage/templates').then(({ saveAllTemplates }) => {
+            saveAllTemplates(newTemplates);
+          });
+        }
+        
+        // 重置狀態
+        setDraggedItem(null);
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setIsAnimating(true);
+        
+        // 快速重置位置動畫
+        Animated.parallel([
+          Animated.timing(dragPosition, {
+            toValue: { x: 0, y: 0 },
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dragAnimValue, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dragScale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          })
+        ]).start(() => {
+          setIsAnimating(false);
+        });
+      },
+    });
+  }, [templates, dragOverIndex, draggedIndex, dragAnimValue, dragPosition, dragScale, initialTouchPosition]);
 
   return (
     <View style={styles.container}>
@@ -120,7 +263,7 @@ export default function HomeScreen() {
           style={styles.templateButton}
         >
           <Text style={styles.templateButtonText}>
-            {template ? template.name : getWord('Select Template')}
+            {template ? truncateByBytes(template.name, 24) : getWord('Select Template')}
           </Text>
           <Text style={styles.dropdownArrow}>▼</Text>
         </TouchableOpacity>
@@ -165,22 +308,77 @@ export default function HomeScreen() {
             <FlatList
               data={templates}
               keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => onSelectTemplate(item.id)}
-                  style={[
-                    styles.templateOption,
-                    template && template.id === item.id && styles.templateOptionActive
-                  ]}
-                >
-                  <Text style={[
-                    styles.templateOptionText,
-                    template && template.id === item.id && styles.templateOptionTextActive
-                  ]}>
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              renderItem={({ item, index }) => {
+                const panResponder = createDragResponder(item, index);
+                const isDragging = draggedIndex === index;
+                const isDragOver = dragOverIndex === index && draggedIndex !== index;
+                
+                // 計算其他項目的位移
+                let translateY = 0;
+                if (draggedIndex !== null && !isDragging && !isAnimating) {
+                  if (draggedIndex < index && dragOverIndex !== null && dragOverIndex >= index) {
+                    translateY = -48; // 向上移動一個項目高度
+                  } else if (draggedIndex > index && dragOverIndex !== null && dragOverIndex <= index) {
+                    translateY = 48; // 向下移動一個項目高度
+                  }
+                }
+                
+                return (
+                  <View style={styles.templateOptionWrapper}>
+                    <Animated.View
+                      style={[
+                        styles.templateOption,
+                        template && template.id === item.id && styles.templateOptionActive,
+                        isDragging && styles.templateOptionDragging,
+                        isDragOver && styles.templateOptionDragOver,
+                        {
+                          transform: [
+                            {
+                              translateX: isDragging ? dragPosition.x : 0,
+                            },
+                            {
+                              translateY: isDragging ? dragPosition.y : translateY,
+                            },
+                            {
+                              scale: isDragging ? dragScale : dragAnimValue.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [1, 1.05],
+                              }),
+                            },
+                          ],
+                          opacity: isDragging ? 0.9 : 1,
+                          zIndex: isDragging ? 1000 : 1,
+                          elevation: isDragging ? 8 : 0,
+                          shadowColor: isDragging ? '#000' : 'transparent',
+                          shadowOffset: isDragging ? { width: 0, height: 4 } : { width: 0, height: 0 },
+                          shadowOpacity: isDragging ? 0.3 : 0,
+                          shadowRadius: isDragging ? 8 : 0,
+                        },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() => onSelectTemplate(item.id)}
+                        style={styles.templateOptionContent}
+                      >
+                        <Text style={[
+                          styles.templateOptionText,
+                          template && template.id === item.id && styles.templateOptionTextActive
+                        ]}>
+                          {truncateByBytes(item.name, 24)}
+                        </Text>
+                      </TouchableOpacity>
+                      <View style={styles.dragHandleContainer}>
+                        <Animated.View
+                          {...panResponder.panHandlers}
+                          style={styles.dragHandleTouchable}
+                        >
+                          <Text style={styles.dragHandle}>⋮⋮</Text>
+                        </Animated.View>
+                      </View>
+                    </Animated.View>
+                  </View>
+                );
+              }}
             />
             <TouchableOpacity 
               onPress={() => setShowTemplateDropdown(false)} 
@@ -293,8 +491,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  templateOptionWrapper: {
+    marginBottom: 8,
+  },
   templateOption: {
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
@@ -303,12 +506,40 @@ const styles = StyleSheet.create({
   templateOptionActive: {
     backgroundColor: '#e3f2fd',
   },
+  templateOptionContent: {
+    flex: 1,
+    paddingRight: 8,
+  },
   templateOptionText: {
     fontSize: 16,
     color: '#333',
   },
   templateOptionTextActive: {
     color: '#1976d2',
+    fontWeight: 'bold',
+  },
+  templateOptionDragging: {
+    backgroundColor: '#e0e0e0',
+    opacity: 0.9,
+  },
+  templateOptionDragOver: {
+    backgroundColor: '#f8f8f8',
+  },
+  dragHandleContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dragHandleTouchable: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    minWidth: 40,
+  },
+  dragHandle: {
+    fontSize: 16,
+    color: '#999',
     fontWeight: 'bold',
   },
   modalCancelBtn: {
