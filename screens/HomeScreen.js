@@ -44,6 +44,14 @@ export default function HomeScreen() {
     return (template.options || []).filter(o => o.enabled !== false && (!hidePicked || !hiddenSet.has(o.id)));
   }, [template, hidePicked]);
 
+  // 創建一個唯一的 key 來強制重新渲染圓盤組件
+  const wheelKey = useMemo(() => {
+    if (!template) return 'empty';
+    const enabledCount = (template.options || []).filter(o => o.enabled !== false).length;
+    const hiddenCount = template.hiddenOptionIds?.length || 0;
+    return `${template.id}-${enabledCount}-${hiddenCount}-${hidePicked}`;
+  }, [template, hidePicked]);
+
   const onResult = useCallback(async (opt) => {
     setLastResult(opt);
     if (!template) return;
@@ -100,7 +108,7 @@ export default function HomeScreen() {
           <Text style={styles.resultPlaceholder}>{getWord('Spin to see result')}</Text>
         )}
       </View>
-      <Wheel options={optionsForWheel} onResult={onResult} />
+      <Wheel key={wheelKey} options={optionsForWheel} onResult={onResult} />
       <View style={styles.bottomRow}>
         <View style={styles.rowLeft}>
           <Switch value={hidePicked} onValueChange={onToggleHidePicked} />

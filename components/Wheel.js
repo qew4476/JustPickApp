@@ -1,6 +1,6 @@
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { Animated, Easing, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Svg, { Path, Text as SvgText, G, Circle } from 'react-native-svg';
+import Svg, { Path, Text as SvgText, G, Circle, Defs, TextPath } from 'react-native-svg';
 
 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'];
 
@@ -9,6 +9,12 @@ const Wheel = ({ options, onResult }) => {
   const [spinning, setSpinning] = useState(false);
 
   const visibleOptions = useMemo(() => options.filter(o => o.enabled !== false), [options]);
+
+  // 當選項改變時，重置旋轉狀態和動畫值
+  useEffect(() => {
+    rotation.setValue(0);
+    setSpinning(false);
+  }, [options, rotation]);
 
   function spin() {
     if (spinning || visibleOptions.length === 0) return;
@@ -50,11 +56,24 @@ const Wheel = ({ options, onResult }) => {
     return `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
   }
 
+  function createRadialTextPath(centerX, centerY, startRadius, endRadius, angle) {
+    const angleRad = ((angle - 90) * Math.PI) / 180;
+    
+    const x1 = centerX + startRadius * Math.cos(angleRad);
+    const y1 = centerY + startRadius * Math.sin(angleRad);
+    const x2 = centerX + endRadius * Math.cos(angleRad);
+    const y2 = centerY + endRadius * Math.sin(angleRad);
+    
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
   function renderSlice(option, index, totalSlices) {
     const angle = 360 / totalSlices;
     const startAngle = index * angle;
     const endAngle = startAngle + angle;
-    const color = colors[index % colors.length];
+    // 使用選項的原始索引來選擇顏色，確保顏色一致性
+    const originalIndex = options.findIndex(o => o.id === option.id);
+    const color = colors[originalIndex % colors.length];
 
     const centerX = 150;
     const centerY = 150;
@@ -62,19 +81,32 @@ const Wheel = ({ options, onResult }) => {
 
     // Special-case: when only one slice remains, draw a full circle.
     if (totalSlices === 1) {
+      const fontSize = 16;
+      const textStartRadius = 30;
+      const textEndRadius = radius - 30;
+      
+      // 創建放射狀文字路徑（從中心向上）
+      const textPathId = `textPath-${option.id}`;
+      const textPath = createRadialTextPath(centerX, centerY, textStartRadius, textEndRadius, 0); // 0度 = 向上
+      
       return (
         <G key={option.id}>
           <Circle cx={centerX} cy={centerY} r={radius} fill={color} stroke="#fff" strokeWidth="2" />
+          
+          {/* 定義文字路徑 */}
+          <Defs>
+            <Path id={textPathId} d={textPath} />
+          </Defs>
+          
+          {/* 文字 - 沿著放射狀路徑顯示 */}
           <SvgText
-            x={centerX}
-            y={centerY}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize="16"
+            fontSize={fontSize}
             fontWeight="bold"
             fill="#333"
           >
-            {option.type === 'subtemplate' ? '⭐ ' : ''}{option.label}
+            <TextPath href={`#${textPathId}`} startOffset="0%">
+              {option.type === 'subtemplate' ? '⭐ ' : ''}{option.label}
+            </TextPath>
           </SvgText>
         </G>
       );
@@ -82,25 +114,49 @@ const Wheel = ({ options, onResult }) => {
 
     const path = createSlicePath(centerX, centerY, radius, startAngle, endAngle);
 
-    const textAngle = (startAngle + endAngle) / 2;
-    const textAngleRad = ((textAngle - 90) * Math.PI) / 180;
-    const textRadius = radius * 0.7;
-    const textX = centerX + textRadius * Math.cos(textAngleRad);
-    const textY = centerY + textRadius * Math.sin(textAngleRad);
+    // 計算扇形的中心角度
+    const centerAngle = (startAngle + endAngle) / 2;
+    const centerAngleRad = ((centerAngle - 90) * Math.PI) / 180;
+    
+    // 計算文字可以使用的半徑範圍（留出邊緣空隙）
+    const edgeMargin = 25; // 離邊緣的空隙
+    const textStartRadius = 20; // 從中心開始的半徑
+    const textEndRadius = radius - edgeMargin; // 結束半徑（留出邊緣空隙）
+    
+    // 根據扇形大小調整文字大小
+    const segmentSize = angle;
+    let fontSize;
+    
+    if (segmentSize >= 60) {
+      fontSize = 12;
+    } else if (segmentSize >= 30) {
+      fontSize = 10;
+    } else {
+      fontSize = 8;
+    }
+
+    // 創建放射狀文字路徑
+    const textPathId = `textPath-${option.id}`;
+    const textPath = createRadialTextPath(centerX, centerY, textStartRadius, textEndRadius, centerAngle);
 
     return (
       <G key={option.id}>
         <Path d={path} fill={color} stroke="#fff" strokeWidth="2" />
+        
+        {/* 定義文字路徑 */}
+        <Defs>
+          <Path id={textPathId} d={textPath} />
+        </Defs>
+        
+        {/* 文字 - 沿著放射狀路徑顯示 */}
         <SvgText
-          x={textX}
-          y={textY}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontSize="12"
+          fontSize={fontSize}
           fontWeight="bold"
           fill="#333"
         >
-          {option.type === 'subtemplate' ? '⭐ ' : ''}{option.label}
+          <TextPath href={`#${textPathId}`} startOffset="0%">
+            {option.type === 'subtemplate' ? '⭐ ' : ''}{option.label}
+          </TextPath>
         </SvgText>
       </G>
     );
