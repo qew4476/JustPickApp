@@ -221,7 +221,11 @@ export default function TemplatesScreen() {
               style={styles.optionLabelContainer}
             >
               <Text 
-                style={[styles.optionLabel, item.enabled === false && styles.optionDisabled]}
+                style={[
+                  styles.optionLabel, 
+                  item.enabled === false && styles.optionDisabled,
+                  item.enabled !== false && styles.optionEnabled
+                ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
@@ -435,6 +439,10 @@ const styles = StyleSheet.create({
   optionDisabled: {
     color: '#999',
     textDecorationLine: 'line-through',
+  },
+  optionEnabled: {
+    color: '#4caf50',
+    fontWeight: '600',
   },
   optionActions: {
     flexDirection: 'row',
