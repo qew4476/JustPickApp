@@ -64,7 +64,6 @@ export default function HomeScreen() {
     // 获取屏幕尺寸
     const { width, height } = Dimensions.get('window');
     setScreenDimensions({ width, height });
-    console.log('屏幕尺寸:', { width, height });
   }, []);
 
   // 當屏幕獲得焦點時刷新數據（例如從 Templates 頁面返回時）
@@ -229,6 +228,29 @@ export default function HomeScreen() {
           } else if (draggedItemAbsoluteY + itemHeight > flatListBottom) {
             // 拖拽到底部邊界
             offsetY = flatListBottom - initialTouchPosition.current.y - itemHeight;
+          }
+        } else if (screenDimensions) {
+          // 如果 flatListAbsolutePosition 還沒有設置，使用屏幕尺寸作為備用限制
+          const itemHeight = 64;
+          const screenHeight = screenDimensions.height;
+          const screenWidth = screenDimensions.width;
+          
+          // 估算Modal的大概位置（屏幕中央）
+          const modalTop = screenHeight * 0.15; // 大約15%的位置
+          const modalBottom = screenHeight * 0.85; // 大約85%的位置
+          
+          // 限制拖拽項目不能超出估算的Modal邊界
+          if (currentY < modalTop) {
+            offsetY = modalTop - initialTouchPosition.current.y;
+          } else if (currentY + itemHeight > modalBottom) {
+            offsetY = modalBottom - initialTouchPosition.current.y - itemHeight;
+          }
+          
+          // 限制水平拖拽範圍
+          if (currentX < 0) {
+            offsetX = -initialTouchPosition.current.x;
+          } else if (currentX > screenWidth) {
+            offsetX = screenWidth - initialTouchPosition.current.x;
           }
         }
         
