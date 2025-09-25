@@ -105,3 +105,7 @@
     - Option types: regular text or sub-template
 
     - Quick Edit Button: directly next to template dropdown
+
+
+# Build command
+    as build --platform android --profile production
