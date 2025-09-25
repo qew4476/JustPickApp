@@ -27,6 +27,8 @@ export default function TemplatesScreen() {
   const [editingText, setEditingText] = useState('');
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
+  const [showTextInputDialog, setShowTextInputDialog] = useState(false);
+  const [dialogText, setDialogText] = useState('');
 
   async function refresh() {
     const [all, current] = await Promise.all([getAllTemplates(), getCurrentTemplateId()]);
@@ -168,6 +170,40 @@ export default function TemplatesScreen() {
     cancelEditingTemplate();
   }
 
+  // 顯示文字輸入dialog
+  function showTextInput() {
+    setDialogText('');
+    setShowTextInputDialog(true);
+  }
+
+  // 取消文字輸入dialog
+  function cancelTextInput() {
+    setShowTextInputDialog(false);
+    setDialogText('');
+  }
+
+  // 保存文字輸入dialog並直接新增選項
+  async function saveTextInput() {
+    if (!dialogText.trim()) {
+      cancelTextInput();
+      return;
+    }
+    
+    // 直接新增選項
+    await addOption(currentId, dialogText.trim(), 'text', '');
+    setNewOptionLabel('');
+    setShowTextInputDialog(false);
+    setDialogText('');
+    await refresh();
+  }
+
+  // 處理Enter鍵按下
+  function handleKeyPress(event) {
+    if (event.nativeEvent.key === 'Enter') {
+      saveTextInput();
+    }
+  }
+
   const tpl = currentTemplate();
 
   return (
@@ -248,7 +284,11 @@ export default function TemplatesScreen() {
 
       <View style={styles.addRow}>
         {newOptionType === 'text' ? (
-          <TextInput value={newOptionLabel} onChangeText={setNewOptionLabel} placeholder={getWord('New option label')} style={styles.input} />
+          <TouchableOpacity onPress={showTextInput} style={styles.textInputButton}>
+            <Text style={[styles.textInputButtonText, newOptionLabel ? styles.textInputButtonTextFilled : styles.textInputButtonTextEmpty]}>
+              {newOptionLabel || getWord('New option label')}
+            </Text>
+          </TouchableOpacity>
         ) : (
           <View style={styles.subTemplateInfo}>
             <Text style={styles.subTemplateInfoText}>
@@ -357,6 +397,38 @@ export default function TemplatesScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={saveEditingTemplate} style={styles.modalSaveBtn}>
                 <Text style={styles.modalSaveText}>{getWord('Save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 文字輸入的 Modal Dialog */}
+      <Modal
+        visible={showTextInputDialog}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelTextInput}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{getWord('Enter Option Text')}</Text>
+            <TextInput
+              value={dialogText}
+              onChangeText={setDialogText}
+              style={styles.modalInput}
+              placeholder={getWord('New option label')}
+              returnKeyType="done"
+              onSubmitEditing={saveTextInput}
+              onKeyPress={handleKeyPress}
+              blurOnSubmit={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={cancelTextInput} style={styles.modalCancelBtn}>
+                <Text style={styles.modalCancelText}>{getWord('Cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveTextInput} style={styles.modalSaveBtn}>
+                <Text style={styles.modalSaveText}>{getWord('Add')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -603,8 +675,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     marginBottom: 20,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    height: 50,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -634,6 +705,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // 文字輸入按鈕樣式
+  textInputButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  textInputButtonText: {
+    fontSize: 15,
+  },
+  textInputButtonTextEmpty: {
+    color: '#999',
+  },
+  textInputButtonTextFilled: {
+    color: '#333',
   },
 });
 
